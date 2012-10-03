@@ -12,9 +12,8 @@ class Auth extends CI_Controller {
 
 		// Load MongoDB library instead of native db driver if required
 		$this->config->item('use_mongodb', 'ion_auth') ?
-		$this->load->library('mongo_db') :
-
-		$this->load->database();
+			$this->load->library('mongo_db') :
+			$this->load->database();
 
 		$this->form_validation->set_error_delimiters($this->config->item('error_start_delimiter', 'ion_auth'), $this->config->item('error_end_delimiter', 'ion_auth'));
 	}
@@ -22,7 +21,9 @@ class Auth extends CI_Controller {
 	//redirect if needed, otherwise display the user list
 	function index()
 	{
-		$this->session->keep_flashdata('message');
+		foreach ($this->session->all_flashdata() as $key => $flashdata) {
+			$this->session->keep_flashdata($key);
+		}
 		redirect('user', 'refresh');
 	}
 
@@ -72,7 +73,7 @@ class Auth extends CI_Controller {
 				'type' => 'password',
 			);
 
-			$this->load->view('auth/login', $this->data);
+			$this->twig->display('auth/login.html.twig', $this->data);
 		}
 	}
 
@@ -92,6 +93,7 @@ class Auth extends CI_Controller {
 	//change password
 	function change_password()
 	{
+		$this->data['title'] = "Change Password";
 		$this->form_validation->set_rules('old', 'Old password', 'required');
 		$this->form_validation->set_rules('new', 'New Password', 'required|min_length[' . $this->config->item('min_password_length', 'ion_auth') . ']|max_length[' . $this->config->item('max_password_length', 'ion_auth') . ']|matches[new_confirm]');
 		$this->form_validation->set_rules('new_confirm', 'Confirm New Password', 'required');
@@ -106,8 +108,6 @@ class Auth extends CI_Controller {
 		if ($this->form_validation->run() == false)
 		{
 			//display the form
-			//set the flash data error message if there is one
-			$this->data['message'] = (validation_errors()) ? validation_errors() : $this->session->flashdata('message');
 
 			$this->data['min_password_length'] = $this->config->item('min_password_length', 'ion_auth');
 			$this->data['old_password'] = array(
@@ -135,7 +135,7 @@ class Auth extends CI_Controller {
 			);
 
 			//render
-			$this->load->view('auth/change_password', $this->data);
+			$this->twig->display('auth/change_password.html.twig', $this->data);
 		}
 		else
 		{
@@ -146,12 +146,26 @@ class Auth extends CI_Controller {
 			if ($change)
 			{
 				//if the password was successfully changed
-				$this->session->set_flashdata('message', $this->ion_auth->messages());
+				if ($this->ion_auth->messages_array())
+				{
+					foreach ($this->ion_auth->messages_array(FALSE) as $message)
+					{
+						$this->session->set_flashdata($message, array('type' => 'success',
+																	  'text' => $message));
+					}
+				}
 				$this->logout();
 			}
 			else
 			{
-				$this->session->set_flashdata('message', $this->ion_auth->errors());
+				if ($this->ion_auth->errors_array())
+				{
+					foreach ($this->ion_auth->errors_array(FALSE) as $error)
+					{
+						$this->session->set_flashdata($error, array('type' => 'error',
+																	'text' => $error));
+					}
+				}
 				redirect('auth/change_password', 'refresh');
 			}
 		}
@@ -289,7 +303,11 @@ class Auth extends CI_Controller {
 		{
 			if (!$this->ion_auth->activate($id, $code))
 			{
-				$this->session->set_flashdata('message', $this->ion_auth->errors());
+				foreach ($this->ion_auth->errors_array(FALSE) as $error)
+				{
+					$this->session->set_flashdata($error, array('type' => 'error',
+																'text' => $error));
+				}
 				//redirect them to the forgot password page
 				redirect('auth/forgot_password', 'refresh');
 			}
@@ -298,12 +316,21 @@ class Auth extends CI_Controller {
 			{
 				if (!$this->ion_auth->activate($id))
 				{
-					$this->session->set_flashdata('message', $this->ion_auth->errors());
+					foreach ($this->ion_auth->errors_array(FALSE) as $error)
+					{
+						$this->session->set_flashdata($error, array('type' => 'error',
+																	'text' => $error));
+					}
 				}
 			}
 
-		$this->session->set_flashdata('message', $this->ion_auth->messages());
+		foreach ($this->ion_auth->messages_array(FALSE) as $message)
+		{
+			$this->session->set_flashdata($message, array('type' => 'success',
+														  'text' => $message));
+		}
 
+		//redirect them to the auth page
 		redirect('auth', 'refresh');
 	}
 

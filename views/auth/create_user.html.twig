@@ -1,0 +1,68 @@
+{% extends 'form_edit.html.twig' %}
+
+{% block fields %}
+	<div class="control-group">
+		{{ form_label('Username:', 'username', {'class': 'control-label'}) }}
+		<div class="controls">
+			{{ form_input(username) }}
+		</div>
+	</div>
+
+	<div class="control-group">
+		{{ form_label('First Name:', 'first_name', {'class': 'control-label'}) }}
+		<div class="controls">
+			{{ form_input(first_name) }}
+		</div>
+	</div>
+
+	<div class="control-group">
+		{{ form_label('Last Name:', 'last_name', {'class': 'control-label'}) }}
+		<div class="controls">
+			{{ form_input(last_name) }}
+		</div>
+	</div>
+
+	<div class="control-group">
+		{{ form_label('Email:', 'email', {'class': 'control-label'}) }}
+		<div class="controls">
+			{{ form_input(email) }}
+		</div>
+	</div>
+
+	<div class="control-group">
+		{{ form_label('Group(s):', 'groups', {'class': 'control-label'}) }}
+		<div class="controls">
+			{{ form_multiselect(groups.name, groups.options, groups.selected, groups.extra) }}
+		</div>
+	</div>
+
+	<div class="control-group">
+		{{ form_label('Company Name:', 'company', {'class': 'control-label'}) }}
+		<div class="controls">
+			{{ form_input(company) }}
+		</div>
+	</div>
+
+		<div class="control-group">
+		{{ form_label('Phone:', 'phone1', {'class': 'control-label'}) }}
+		<div class="controls">
+			{{ form_input(phone1) ~ form_input(phone2) ~ form_input(phone3) }}
+		</div>
+	</div>
+
+	<div class="control-group">
+		{{ form_label('Password:', 'password', {'class': 'control-label'}) }}
+		<div class="controls">
+			{{ form_input(password) }}
+			<span class="help-inline">At least {{ min_password_length }} characters long</span>
+		</div>
+	</div>
+
+	<div class="control-group">
+		{{ form_label('Confirm Password:', 'password_confirm', {'class': 'control-label'}) }}
+		<div class="controls">
+			{{ form_input(password_confirm) }}
+		</div>
+	</div>
+
+{% endblock fields %}

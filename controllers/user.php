@@ -2,6 +2,9 @@
 
 class User extends CI_Controller {
 
+	var $_resource, $can_write, $can_modify, $can_delete;
+	static $title = 'Users';
+
 	function __construct()
 	{
 		parent::__construct();
@@ -17,6 +20,9 @@ class User extends CI_Controller {
 			//redirect them to the home page because they must be an administrator to view this
 			redirect('/', 'refresh');
 		}
+
+		$this->can_write = $this->can_modify = $this->can_delete = TRUE;
+		$this->_resource = $this->uri->rsegment(1);
 	}
 
 	/**
@@ -24,18 +30,48 @@ class User extends CI_Controller {
 	 */
 	function index()
 	{
-		$this->data['title'] = "Users";
-		//set the flash data error message if there is one
-		$this->data['message'] = (validation_errors()) ? validation_errors() : $this->session->flashdata('message');
-
+		$this->data['action'] = "List Users";
+		$this->data['table'] = array();
 		//list the users
-		$table = array();
-		$this->data['users'] = $this->ion_auth->users()->result();
-		foreach ($this->data['users'] as $k => $user)
+		if ($this->input->post())
 		{
-			$this->data['users'][$k]->groups = $this->ion_auth->get_users_groups($user->id)->result();
+			if ($this->input->post('name')) {
+				$this->ion_auth->like($this->ion_auth_model->tables['users'] . '.username', $this->input->post('name'));
+			}
+
+			$this->data['users'] = $this->ion_auth->users()->result();
+
+			if (empty($this->data['users']))
+			{
+				$message = 'No records found';
+				$this->session->set_flashdata($message, array('type' => 'info',
+															  'text' => $message));
+				redirect('user', 'refresh');
+			}
+
+			foreach ($this->data['users'] as $k => $user)
+			{
+				$this->data['users'][$k]->groups = $this->ion_auth->get_users_groups($user->id)->result();
+				$user_groups = array();
+				foreach ($this->data['users'][$k]->groups as $group)
+				{
+					$user_groups[] = $group->name;
+				}
+				$this->data['table'][] = array($user->id,
+											   $user->username,
+											   $user->first_name,
+											   $user->last_name,
+											   $user->email,
+											   implode('<br />', $user_groups),
+											   '<div class="btn-group">' . ($user->active ? anchor('user/deactivate/' . $user->id, '<i class="icon-chevron-down"></i> Deactivate', 'class="btn btn-mini"')
+											   : anchor('user/activate/' . $user->id, '<i class="icon-chevron-up"></i> Activate', 'class="btn btn-mini"')) . '</div>');
+			}
+
+			$this->table->set_heading('Id', 'Username', 'First Name', 'Last Name', 'Email', 'Groups', 'Status');
+			$this->data['table'] = $this->table->generate($this->data['table']);
 		}
-		$this->load->view('auth/index', $this->data);
+
+		$this->twig->display('auth/index.html.twig', $this->data);
 	}
 
 	/**
@@ -52,7 +88,7 @@ class User extends CI_Controller {
 	 */
 	function create()
 	{
-		$this->data['title'] = "Create User";
+		$this->data['action'] = "Create User";
 
 		//validate form input
 		$this->form_validation->set_rules('username', 'Username', 'required|xss_clean');
@@ -84,14 +120,28 @@ class User extends CI_Controller {
 		{
 			//check to see if we are creating the user
 			//redirect them back to the users page
-			$this->session->set_flashdata('message', $this->ion_auth->messages());
-			redirect("user", 'refresh');
+			if ($this->ion_auth->messages_array())
+			{
+				foreach ($this->ion_auth->messages_array(FALSE) as $message)
+				{
+					$this->session->set_flashdata($message, array('type' => 'success',
+																  'text' => $message));
+				}
+			}
+			redirect('user', 'refresh');
 		}
 		else
 		{
 			//display the create user form
 			//set the flash data error message if there is one
-			$this->data['message'] = (validation_errors() ? validation_errors() : ($this->ion_auth->errors() ? $this->ion_auth->errors() : $this->session->flashdata('message')));
+			if ($this->ion_auth->errors_array())
+			{
+				foreach ($this->ion_auth->errors_array(FALSE) as $error)
+				{
+					$this->data['alerts'][] = array('type' => 'error',
+													'text' => $error);
+				}
+			}
 
 			$this->data['min_password_length'] = $this->config->item('min_password_length', 'ion_auth');
 
@@ -157,7 +207,7 @@ class User extends CI_Controller {
 													'required' => 'required',
 													'value'    => $this->form_validation->set_value('password_confirm'),);
 
-			$this->load->view('auth/create_user', $this->data);
+			$this->twig->display('auth/create_user.html.twig', $this->data);
 		}
 	}
 
@@ -168,12 +218,13 @@ class User extends CI_Controller {
 	 */
 	function update($id = NULL, $readonly = FALSE)
 	{
-		$this->data['title'] = ($readonly ? "View" : "Edit") . " User";
+		$this->data['action'] = ($readonly ? "View" : "Edit") . " User";
 
 		if (empty($id) || ($user = $this->ion_auth->user($id)->row()) == FALSE)
 		{
 			$message = 'update_unsuccessful';
-			$this->session->set_flashdata('message', $this->lang->line($message));
+			$this->session->set_flashdata($message, array('type' => 'error',
+														  'text' => $message));
 			redirect('user', 'refresh');
 		}
 
@@ -184,7 +235,9 @@ class User extends CI_Controller {
 		}
 		else
 		{
-			$user->phone = array('', '', '');
+			$user->phone = array('',
+								 '',
+								 '');
 		}
 
 		//validate form input
@@ -228,16 +281,32 @@ class User extends CI_Controller {
 			{
 				//check to see if we are editing the user
 				//redirect them back to the users page
-				$this->session->set_flashdata('message', $this->ion_auth->messages());
-				redirect('user', 'refresh');
+				if ($this->ion_auth->messages_array())
+				{
+					foreach ($this->ion_auth->messages_array(FALSE) as $message)
+					{
+						$this->session->set_flashdata($message, array('type' => 'success',
+																	  'text' => $message));
+					}
+				}
+				redirect('user/read/'.$user->id, 'refresh');
+			}
+			else
+			{
+				//set the flash data error message if there is one
+				if ($this->ion_auth->errors_array())
+				{
+					foreach ($this->ion_auth->errors_array(FALSE) as $error)
+					{
+						$this->data['alerts'][] = array('type' => 'error',
+														'text' => $error);
+					}
+				}
 			}
 		}
 
 		//display the edit user form
 		$this->data['csrf'] = $this->_get_csrf_nonce();
-
-		//set the flash data error message if there is one
-		$this->data['message'] = (validation_errors() ? validation_errors() : ($this->ion_auth->errors() ? $this->ion_auth->errors() : $this->session->flashdata('message')));
 
 		$this->data['min_password_length'] = $this->config->item('min_password_length', 'ion_auth');
 
@@ -332,7 +401,7 @@ class User extends CI_Controller {
 
 		$this->data['readonly'] = $readonly;
 
-		$this->load->view('auth/edit_user', $this->data);
+		$this->twig->display('auth/edit_user.html.twig', $this->data);
 	}
 
 	/**
@@ -343,11 +412,19 @@ class User extends CI_Controller {
 	{
 		if ($this->ion_auth->delete_user($id))
 		{
-			$this->session->set_flashdata('message', $this->ion_auth->messages());
+			foreach ($this->ion_auth->messages_array(FALSE) as $message)
+			{
+				$this->session->set_flashdata($message, array('type' => 'success',
+															  'text' => $message));
+			}
 		}
 		else
 		{
-			$this->session->set_flashdata('message', $this->ion_auth->errors());
+			foreach ($this->ion_auth->errors_array(FALSE) as $error)
+			{
+				$this->session->set_flashdata($error, array('type' => 'error',
+															'text' => $error));
+			}
 		}
 
 		//redirect them back to the users page
@@ -373,7 +450,7 @@ class User extends CI_Controller {
 			$this->data['csrf'] = $this->_get_csrf_nonce();
 			$this->data['user'] = $this->ion_auth->user($id)->row();
 
-			$this->load->view('auth/deactivate_user', $this->data);
+			$this->twig->display('auth/deactivate_user.html.twig', $this->data);
 		}
 		else
 		{
@@ -388,11 +465,19 @@ class User extends CI_Controller {
 
 				if ($this->ion_auth->deactivate($id))
 				{
-					$this->session->set_flashdata('message', $this->ion_auth->messages());
+					foreach ($this->ion_auth->messages_array(FALSE) as $message)
+					{
+						$this->session->set_flashdata($message, array('type' => 'success',
+																	  'text' => $message));
+					}
 				}
 				else
 				{
-					$this->session->set_flashdata('message', $this->ion_auth->errors());
+					foreach ($this->ion_auth->errors_array(FALSE) as $error)
+					{
+						$this->session->set_flashdata($error, array('type' => 'error',
+																	'text' => $error));
+					}
 				}
 			}
 
@@ -409,11 +494,19 @@ class User extends CI_Controller {
 	{
 		if ($this->ion_auth->activate($id))
 		{
-			$this->session->set_flashdata('message', $this->ion_auth->messages());
+			foreach ($this->ion_auth->messages_array(FALSE) as $message)
+			{
+				$this->session->set_flashdata($message, array('type' => 'success',
+															  'text' => $message));
+			}
 		}
 		else
 		{
-			$this->session->set_flashdata('message', $this->ion_auth->errors());
+			foreach ($this->ion_auth->errors_array(FALSE) as $error)
+			{
+				$this->session->set_flashdata($error, array('type' => 'error',
+															'text' => $error));
+			}
 		}
 
 		//redirect them back to the users page

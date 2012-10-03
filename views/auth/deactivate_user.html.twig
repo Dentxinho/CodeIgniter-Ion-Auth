@@ -1,0 +1,13 @@
+{% extends 'form_edit.html.twig' %}
+{% block fields %}
+	{{ form_hidden(csrf) }}
+	{{ form_hidden({'id' : user.id}) }}
+
+	{{ form_label('Are you sure you want to deactivate the user '~user.username~'?', 'confirm') }}
+	<label class="radio">
+		<input type="radio" name="confirm" value="yes" checked="checked">Yes
+	</label>
+	<label class="radio">
+	  	<input type="radio" name="confirm" value="no">No
+	</label>
+{% endblock fields %}
