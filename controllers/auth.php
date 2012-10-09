@@ -46,32 +46,29 @@ class Auth extends CI_Controller {
 			{
 				//if the login is successful
 				//redirect them back to the home page
-				$this->session->set_flashdata('message', $this->ion_auth->messages());
+				$this->session->set_flashdata('message', array('type' => 'success',
+															   'text' => $this->ion_auth->messages()));
 				redirect('/', 'refresh');
 			}
 			else
 			{
 				//if the login was un-successful
 				//redirect them back to the login page
-				$this->session->set_flashdata('message', $this->ion_auth->errors());
+				$this->session->set_flashdata('message', array('type' => 'error',
+															   'text' => $this->ion_auth->errors()));
 				redirect('auth/login', 'refresh'); //use redirects instead of loading views for compatibility with MY_Controller libraries
 			}
 		}
 		else
 		{
 			//the user is not logging in so display the login page
-			//set the flash data error message if there is one
-			$this->data['message'] = (validation_errors()) ? validation_errors() : $this->session->flashdata('message');
-
-			$this->data['identity'] = array('name' => 'identity',
-				'id' => 'identity',
-				'type' => 'text',
-				'value' => $this->form_validation->set_value('identity'),
-			);
+			$this->data['identity'] = array('name'  => 'identity',
+											'id'    => 'identity',
+											'type'  => 'text',
+											'value' => $this->form_validation->set_value('identity'),);
 			$this->data['password'] = array('name' => 'password',
-				'id' => 'password',
-				'type' => 'password',
-			);
+											'id'   => 'password',
+											'type' => 'password',);
 
 			$this->twig->display('auth/login.html.twig', $this->data);
 		}
@@ -86,7 +83,11 @@ class Auth extends CI_Controller {
 		$logout = $this->ion_auth->logout();
 
 		//redirect them to the login page
-		$this->session->set_flashdata('message', $this->ion_auth->messages());
+		foreach ($this->ion_auth->messages_array(FALSE) as $message)
+		{
+			$this->session->set_flashdata($message, array('type' => 'success',
+														  'text' => $message));
+		}
 		redirect('auth/login', 'refresh');
 	}
 
@@ -95,8 +96,8 @@ class Auth extends CI_Controller {
 	{
 		$this->data['title'] = "Change Password";
 		$this->form_validation->set_rules('old', 'Old password', 'required');
-		$this->form_validation->set_rules('new', 'New Password', 'required|min_length[' . $this->config->item('min_password_length', 'ion_auth') . ']|max_length[' . $this->config->item('max_password_length', 'ion_auth') . ']|matches[new_confirm]');
 		$this->form_validation->set_rules('new_confirm', 'Confirm New Password', 'required');
+		$this->form_validation->set_rules('new', 'New Password', 'required|min_length[' . $this->config->item('min_password_length', 'ion_auth') . ']|max_length[' . $this->config->item('max_password_length', 'ion_auth') . ']|matches[new_confirm]');
 
 		if (!$this->ion_auth->logged_in())
 		{
@@ -110,29 +111,21 @@ class Auth extends CI_Controller {
 			//display the form
 
 			$this->data['min_password_length'] = $this->config->item('min_password_length', 'ion_auth');
-			$this->data['old_password'] = array(
-				'name' => 'old',
-				'id'   => 'old',
-				'type' => 'password',
-			);
-			$this->data['new_password'] = array(
-				'name' => 'new',
-				'id'   => 'new',
-				'type' => 'password',
-				'pattern' => '^.{'.$this->data['min_password_length'].'}.*$',
-			);
-			$this->data['new_password_confirm'] = array(
-				'name' => 'new_confirm',
-				'id'   => 'new_confirm',
-				'type' => 'password',
-				'pattern' => '^.{'.$this->data['min_password_length'].'}.*$',
-			);
-			$this->data['user_id'] = array(
-				'name'  => 'user_id',
-				'id'    => 'user_id',
-				'type'  => 'hidden',
-				'value' => $user->id,
-			);
+			$this->data['old_password'] = array('name' => 'old',
+												'id'   => 'old',
+												'type' => 'password',);
+			$this->data['new_password'] = array('name'    => 'new',
+												'id'      => 'new',
+												'type'    => 'password',
+												'pattern' => '^.{' . $this->data['min_password_length'] . '}.*$',);
+			$this->data['new_password_confirm'] = array('name'    => 'new_confirm',
+														'id'      => 'new_confirm',
+														'type'    => 'password',
+														'pattern' => '^.{' . $this->data['min_password_length'] . '}.*$',);
+			$this->data['user_id'] = array('name'  => 'user_id',
+										   'id'    => 'user_id',
+										   'type'  => 'hidden',
+										   'value' => $user->id,);
 
 			//render
 			$this->twig->display('auth/change_password.html.twig', $this->data);
@@ -179,9 +172,7 @@ class Auth extends CI_Controller {
 		{
 			//setup the input
 			$this->data['email'] = array('name' => 'email',
-				'id' => 'email',
-			);
-
+										 'id'   => 'email',);
 			//set any errors and display the form
 			$this->data['message'] = (validation_errors()) ? validation_errors() : $this->session->flashdata('message');
 			$this->load->view('auth/forgot_password', $this->data);
@@ -230,24 +221,18 @@ class Auth extends CI_Controller {
 				$this->data['message'] = (validation_errors()) ? validation_errors() : $this->session->flashdata('message');
 
 				$this->data['min_password_length'] = $this->config->item('min_password_length', 'ion_auth');
-				$this->data['new_password'] = array(
-					'name' => 'new',
-					'id'   => 'new',
-				'type' => 'password',
-					'pattern' => '^.{'.$this->data['min_password_length'].'}.*$',
-				);
-				$this->data['new_password_confirm'] = array(
-					'name' => 'new_confirm',
-					'id'   => 'new_confirm',
-					'type' => 'password',
-					'pattern' => '^.{'.$this->data['min_password_length'].'}.*$',
-				);
-				$this->data['user_id'] = array(
-					'name'  => 'user_id',
-					'id'    => 'user_id',
-					'type'  => 'hidden',
-					'value' => $user->id,
-				);
+				$this->data['new_password'] = array('name'    => 'new',
+													'id'      => 'new',
+													'type'    => 'password',
+													'pattern' => '^.{' . $this->data['min_password_length'] . '}.*$',);
+				$this->data['new_password_confirm'] = array('name'    => 'new_confirm',
+															'id'      => 'new_confirm',
+															'type'    => 'password',
+															'pattern' => '^.{' . $this->data['min_password_length'] . '}.*$',);
+				$this->data['user_id'] = array('name'  => 'user_id',
+											   'id'    => 'user_id',
+											   'type'  => 'hidden',
+											   'value' => $user->id,);
 				$this->data['csrf'] = $this->_get_csrf_nonce();
 				$this->data['code'] = $code;
 
