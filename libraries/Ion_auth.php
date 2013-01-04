@@ -59,9 +59,18 @@ class Ion_auth
 	{
 		$this->load->config('ion_auth', TRUE);
 		$this->load->library('email');
-		$this->load->library('session');
 		$this->lang->load('ion_auth');
 		$this->load->helper('cookie');
+
+		//Load the session, CI2 as a library, CI3 uses it as a driver
+		if (substr(CI_VERSION, 0, 1) == '2') 
+		{
+			$this->load->library('session');
+		}
+		else
+		{
+			$this->load->driver('session');
+		}
 
 		// Load IonAuth MongoDB model if it's set to use MongoDB,
 		// We assign the model object to "ion_auth_model" variable.
@@ -79,7 +88,7 @@ class Ion_auth
 
 		$email_config = $this->config->item('email_config', 'ion_auth');
 
-		if (isset($email_config) && is_array($email_config))
+		if ($this->config->item('use_ci_email', 'ion_auth') && isset($email_config) && is_array($email_config))
 		{
 			$this->email->initialize($email_config);
 		}
@@ -386,9 +395,14 @@ class Ion_auth
 			delete_cookie('remember_code');
 		}
 
-		//Recreate the session
+		//Destroy the session
 		$this->session->sess_destroy();
-		$this->session->sess_create();
+
+		//Recreate the session
+		if (substr(CI_VERSION, 0, 1) == '2') 
+		{
+			$this->session->sess_create();
+		}
 
 		$this->set_message('logout_successful');
 		return TRUE;
