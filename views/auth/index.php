@@ -25,7 +25,7 @@
                 <?php endforeach?>
 			</td>
 			<td><?php echo ($user->active) ? anchor("user/deactivate/".$user->id, 'Active') : anchor("user/activate/". $user->id, 'Inactive');?></td>
-			<td><?php echo anchor("user/edit_user/".$user->id, 'Edit') ;?></td>
+			<td><?php echo anchor("user/update/".$user->id, 'Edit') ;?></td>
 		</tr>
 	<?php endforeach;?>
 </table>
