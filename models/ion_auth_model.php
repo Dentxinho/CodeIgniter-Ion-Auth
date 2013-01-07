@@ -168,7 +168,17 @@ class Ion_auth_model extends CI_Model
 		$this->load->config('ion_auth', TRUE);
 		$this->load->helper('cookie');
 		$this->load->helper('date');
-		$this->load->library('session');
+
+		//Load the session, CI2 as a library, CI3 uses it as a driver
+		if (substr(CI_VERSION, 0, 1) == '2') 
+		{
+			$this->load->library('session');
+		}
+		else
+		{
+			$this->load->driver('session');
+		}
+		
 		$this->lang->load('ion_auth');
 
 		//initialize db tables data
@@ -561,25 +571,24 @@ class Ion_auth_model extends CI_Model
 			return FALSE;
 		}
 
-		$result = $query->row();
+		$user = $query->row();
 
-		$db_password = $result->password;
-		$old         = $this->hash_password_db($result->id, $old);
-		$new         = $this->hash_password($new, $result->salt);
+		$old_password_matches = $this->hash_password_db($user->id, $old);
 
-		if ($old === TRUE)
+		if ($old_password_matches === TRUE)
 		{
 			//store the new password and reset the remember code so all remembered instances have to re-login
+			$hashed_new_password  = $this->hash_password($new, $user->salt);
 			$data = array(
-			    'password' => $new,
+			    'password' => $hashed_new_password,
 			    'remember_code' => NULL,
 			);
 
 			$this->trigger_events('extra_where');
 			$this->db->update($this->tables['users'], $data, array($this->identity_column => $identity));
 
-			$return = $this->db->affected_rows() == 1;
-			if ($return)
+			$successfully_changed_password_in_db = $this->db->affected_rows() == 1;
+			if ($successfully_changed_password_in_db)
 			{
 				$this->trigger_events(array('post_change_password', 'post_change_password_successful'));
 				$this->set_message('password_change_successful');
@@ -590,7 +599,7 @@ class Ion_auth_model extends CI_Model
 				$this->set_error('password_change_unsuccessful');
 			}
 
-			return $return;
+			return $successfully_changed_password_in_db;
 		}
 
 		$this->set_error('password_change_unsuccessful');
@@ -1683,6 +1692,114 @@ class Ion_auth_model extends CI_Model
 
 		$this->trigger_events(array('post_login_remembered_user', 'post_login_remembered_user_unsuccessful'));
 		return FALSE;
+	}
+
+
+	/**
+	 * create_group
+	 *
+	 * @author aditya menon
+	*/
+	public function create_group($group_name = FALSE, $group_description = NULL)
+	{
+		// bail if the group name was not passed
+		if(!$group_name)
+		{
+			return FALSE;
+		}
+
+		// bail if the group name already exists
+		$existing_group = $this->db->get_where($this->tables['groups'], array('name' => $group_name))->num_rows();
+		if($existing_group !== 0)
+		{
+			$this->set_error('group_already_exists');
+			return FALSE;
+		}
+
+		// insert the new group
+		$this->db->insert($this->tables['groups'], array('name' => $group_name, 'description' => $group_description));
+		$group_id = $this->db->insert_id();
+
+		// report success
+		$this->set_message('group_creation_successful');
+		// return the brand new group id
+		return $group_id;
+	}
+
+	/**
+	 * update_group
+	 *
+	 * @return bool
+	 * @author aditya menon
+	 **/
+	public function update_group($group_id = FALSE, $group_name = FALSE, $group_description = NULL)
+	{
+		$mandatory = array($group_id, $group_name);
+
+		// bail if no group id or name given
+		foreach ($mandatory as $mandatory_param) {		
+			if(!$mandatory_param || empty($mandatory_param))
+			{
+				return FALSE;
+			}
+		}
+
+		// bail if the group name already exists
+		$existing_group = $this->db->get_where($this->tables['groups'], array('name' => $group_name))->row();
+		if(isset($existing_group->id) && $existing_group->id != $group_id)
+		{
+			$this->set_error('group_already_exists');
+			return FALSE;
+		}
+
+		$query_data = array(
+			'name' => $group_name,
+			'description' => $group_description,
+		);
+
+		$this->db->update($this->tables['groups'], $query_data, array('id' => $group_id));
+
+		$this->set_message('group_update_successful');
+
+		return TRUE;
+	}
+
+	/**
+	* delete_group
+	*
+	* @return bool
+	* @author aditya menon
+	**/
+	public function delete_group($group_id = FALSE)
+	{
+		// bail if mandatory param not set
+		if(!$group_id || empty($group_id))
+		{
+			return FALSE;
+		}
+
+		$this->trigger_events('pre_delete_group');
+
+		$this->db->trans_begin();
+
+		// remove all users from this group
+		$this->db->delete($this->tables['users_groups'], array('group_id' => $group_id));
+		// remove the group itself
+		$this->db->delete($this->tables['groups'], array('id' => $group_id));
+
+		if ($this->db->trans_status() === FALSE)
+		{
+			$this->db->trans_rollback();
+			$this->trigger_events(array('post_delete_group', 'post_delete_group_unsuccessful'));
+			$this->set_error('group_delete_unsuccessful');
+			return FALSE;
+		}
+
+		$this->db->trans_commit();
+
+		$this->trigger_events(array('post_delete_group', 'post_delete_group_successful'));
+		$this->set_message('group_delete_successful');
+		return TRUE;
 	}
 
 	public function set_hook($event, $name, $class, $method, $arguments)
